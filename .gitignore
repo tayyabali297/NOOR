@@ -1,0 +1,26 @@
+# API keys and credentials — never commit these
+config.py
+google_credentials.json
+google_credentials.json.json
+google_token.json
+.cache
+
+# Python
+*.pyc
+__pycache__/
+
+# Personal data
+data/
+*.mp3
+
+# Environment
+.env
+
+# Design files (large, not needed for running)
+design_extracted/
+design_reference.html
+*.zip
+
+# Editor
+.vscode/
+*.swp
