@@ -247,7 +247,7 @@ EMAIL_APP_PASS        = ""               # Gmail App Password (optional)
 
 ### 5. Set up your personal profile
 
-Edit `jarvis_knowledge.md` and replace the contents with your own profile. This file is loaded into every Claude prompt, so Noor understands your context. Include:
+Edit `noor_knowledge.md` and replace the contents with your own profile. This file is loaded into every Claude prompt, so Noor understands your context. Include:
 - Your name, age, location
 - Current projects
 - Goals and preferences
@@ -396,10 +396,10 @@ NOOR/
 ├── noor.html                # Frontend dashboard — HTML/CSS/JS, connects via WebSocket
 ├── config.py                # Your API keys (never commit this)
 ├── config.example.py        # Template — copy this to config.py
-├── jarvis_knowledge.md      # Your personal profile loaded into every Claude prompt
+├── noor_knowledge.md      # Your personal profile loaded into every Claude prompt
 ├── requirements.txt         # Python dependencies
 ├── launch.bat               # Double-click to run (opens in terminal)
-├── jarvis.vbs               # Silent launcher (no terminal window)
+├── noor.vbs               # Silent launcher (no terminal window)
 ├── make_shortcut.ps1        # Creates a Desktop shortcut
 └── data/
     ├── tasks.json           # Task list (auto-created)
@@ -457,7 +457,7 @@ User: "play Frank Ocean"
 ```
 User: "what do you think about stoicism?"
   → route() finds no match
-  → think() sends to Claude API with SYSTEM_PROMPT + jarvis_knowledge.md
+  → think() sends to Claude API with SYSTEM_PROMPT + noor_knowledge.md
   → Claude responds
   → speak() reads response
 ```
@@ -523,7 +523,7 @@ if any(x in t for x in ["flip a coin", "coin flip"]):
 
 ### Change the personal profile
 
-Edit `jarvis_knowledge.md` with your own details. Everything in this file is prepended to every Claude API call, so Noor always has your context.
+Edit `noor_knowledge.md` with your own details. Everything in this file is prepended to every Claude API call, so Noor always has your context.
 
 ### Add a dashboard button
 
