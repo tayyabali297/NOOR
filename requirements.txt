@@ -3,7 +3,6 @@ numpy
 requests
 edge-tts
 pygame
-customtkinter
 feedparser
 spotipy
 pyautogui
@@ -18,3 +17,4 @@ pygetwindow
 pycaw
 comtypes
 websockets
+pywebview

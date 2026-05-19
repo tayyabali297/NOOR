@@ -109,7 +109,7 @@ if os.path.exists(KNOW_F):
     with open(KNOW_F, encoding="utf-8") as f:
         _knowledge = f.read()
 
-SYSTEM_PROMPT = f"""You are J.A.R.V.I.S, Tayyab's personal AI assistant.
+SYSTEM_PROMPT = f"""You are N.O.O.R, Tayyab's personal AI assistant.
 CRITICAL RULE: Reply in 1 sentence maximum. No lists, no markdown, no elaboration.
 Occasionally say "sir". Never suggest alcohol.
 
@@ -528,7 +528,7 @@ def speak(text: str):
 def record_and_transcribe(seconds: int, after_speech: bool = False) -> str:
     """Wait for TTS to finish, then record and transcribe. Speaking stops if mic picks up voice."""
     global _interrupt_speech
-    # If user speaks while Jarvis is talking, interrupt it
+    # If user speaks while Noor is talking, interrupt it
     if is_speaking:
         _interrupt_speech = True
     while is_speaking:
@@ -1203,7 +1203,7 @@ def get_today_calories() -> int:
 def take_note(text: str) -> str:
     with open(NOTES_F, "a", encoding="utf-8") as f:
         f.write(f"[{datetime.now():%Y-%m-%d %H:%M}] {text}\n")
-    # Keep history in context so Jarvis knows what was noted
+    # Keep history in context so Noor knows what was noted
     history.append({"role": "user",    "content": f"[system] Note saved: {text}"})
     history.append({"role": "assistant","content": "Noted."})
     if len(history) > 20:
