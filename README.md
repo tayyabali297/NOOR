@@ -2,58 +2,71 @@
 
 A voice-activated personal AI assistant for Windows. Talks back. Controls your computer. Knows your context. Runs entirely locally — no cloud deployment, no subscription.
 
-Built for Tayyab. Dublin, Ireland. Windows 11. Python 3.11.
+Windows 11 · Python 3.11 · Always listening · Always ready
 
 ---
 
-## How It Works — Architecture
+## How It Works
 
+```mermaid
+flowchart TD
+    A([🎤 You Speak]) --> B[Wake Word Check\nhey noor / noor / okay noor]
+    B -->|detected| C[Record Command\n7 seconds]
+    B -->|silence| B
+    C --> D{Router\nroute}
+    D -->|command matched| E[Local Tool\nweather / spotify / tasks\ncalendar / gmail / apps...]
+    D -->|no match| F[Claude Haiku API\nconversational fallback]
+    E --> G[edge-tts\nMicrosoft Neural Voice]
+    F --> G
+    G --> H([🔊 You Hear It])
+    H -->|up to 5 turns| C
+    H -->|bye / thanks / stop| I([💤 Back to Standby])
 ```
-You speak
-    │
-    ▼
-┌─────────────────────┐
-│  Microphone         │  Always listening at low sensitivity
-│  (sounddevice)      │
-└────────┬────────────┘
-         │ audio stream
-         ▼
-┌─────────────────────┐
-│  Wake Word Check    │  "hey noor", "noor", "okay noor" + variants
-│  (SpeechRecognition)│
-└────────┬────────────┘
-         │ wake word detected
-         ▼
-┌─────────────────────┐
-│  Command Recording  │  7 seconds to say your command
-│  (Google STT)       │
-└────────┬────────────┘
-         │ text
-         ▼
-┌─────────────────────┐
-│  Router (route())   │  ~60 built-in command patterns
-└────┬──────────┬─────┘
-     │ matched  │ no match
-     ▼          ▼
-┌─────────┐  ┌───────────────────┐
-│  Tool   │  │  Claude Haiku API │  Conversational fallback
-│ (local) │  │  (Anthropic)      │  Knows your personal profile
-└────┬────┘  └────────┬──────────┘
-     └────────────────┘
-              │ text response
-              ▼
-┌─────────────────────┐
-│  edge-tts           │  Microsoft Neural TTS, British voice
-│  (en-GB-SoniaNeural)│
-└────────┬────────────┘
-         │ audio
-         ▼
-┌─────────────────────┐
-│  pygame             │  Plays the audio
-└────────┬────────────┘
-         │
-         ▼
-     You hear it
+
+---
+
+## System Components
+
+```mermaid
+graph LR
+    subgraph Input
+        MIC[🎤 Microphone\nsounddevice]
+        STT[Google STT\nSpeechRecognition]
+    end
+
+    subgraph Brain
+        ROUTER[Router\n60+ command rules]
+        CLAUDE[Claude Haiku\nAnthropic API]
+        KNOW[noor_knowledge.md\npersonal profile]
+    end
+
+    subgraph Output
+        TTS[edge-tts\nSonia Neural]
+        PLAY[pygame\naudio playback]
+    end
+
+    subgraph GUI
+        CTK[customtkinter\ndark GUI]
+        WS[WebSocket :8765]
+        HTML[noor.html\nbrowser dashboard]
+    end
+
+    subgraph Data
+        TASKS[tasks.json]
+        HEALTH[health.json]
+        NOTES[notes.txt]
+        CALS[calories.json]
+    end
+
+    MIC --> STT --> ROUTER
+    ROUTER --> CLAUDE
+    KNOW --> CLAUDE
+    ROUTER --> TTS
+    CLAUDE --> TTS
+    TTS --> PLAY
+    ROUTER --> CTK
+    ROUTER --> TASKS & HEALTH & NOTES & CALS
+    CTK <--> WS <--> HTML
 ```
 
 ---
@@ -63,266 +76,229 @@ You speak
 ```
 N.O.O.R/
 │
-├── main.py                  ← The entire app (GUI + voice + tools + routing)
-├── config.py                ← Your API keys — never commit this
-├── config.example.py        ← Template to create config.py from
+├── main.py                  ← Entire app: GUI + voice + tools + routing (2100+ lines)
+├── config.py                ← Your API keys — never committed (in .gitignore)
+├── config.example.py        ← Template — copy this to make config.py
 │
-├── noor_knowledge.md        ← Your personal profile (loaded into every Claude prompt)
-├── noor.html                ← Browser-based dashboard (connects via WebSocket)
+├── noor.html                ← Browser-based HUD dashboard (connects via WebSocket)
+├── noor.vbs                 ← Silent desktop launcher (no black console window)
+├── launch.bat               ← Terminal launcher with port cleanup
 │
-├── noor.vbs                 ← Desktop launcher (no black console window)
-├── launch.bat               ← Terminal launcher (with port cleanup)
+├── requirements.txt         ← pip install -r requirements.txt
+├── test_jarvis.py           ← 9 routing tests (all passing)
 │
-├── requirements.txt         ← Python packages to install
-├── test_jarvis.py           ← Automated tests for the routing logic
-│
-├── google_credentials.json  ← Google OAuth credentials (from Google Cloud Console)
-├── google_token.json        ← Saved Google login token (auto-generated on first use)
+├── google_credentials.json  ← Google OAuth creds (not committed — .gitignore)
+├── google_token.json        ← Saved Google token (auto-generated, not committed)
 │
 ├── tayyab_review/
 │   └── HOW_IT_WORKS.md      ← Plain English explanation of every decision made
 │
-└── data/
-    ├── tasks.json           ← Your task list
-    ├── health.json          ← Logged meals
-    ├── workout.json         ← Weekly training split + session logs
-    ├── calories.json        ← Daily calorie totals by date
+└── data/                    ← All local data (not committed — .gitignore)
+    ├── tasks.json           ← Task list
+    ├── health.json          ← Meal logs
+    ├── workout.json         ← Training split + session logs
+    ├── calories.json        ← Daily calorie totals
     └── notes.txt            ← Voice notes with timestamps
 ```
-
----
-
-## Tech Stack
-
-| Component | Library / Service | Why |
-|---|---|---|
-| GUI | customtkinter | Modern-looking, runs on Windows without setup |
-| Voice input | SpeechRecognition + Google STT | Free, no API key needed |
-| AI brain | Claude Haiku (Anthropic API) | Fast, cheap, smart enough for 1-sentence answers |
-| Voice output | edge-tts (Microsoft Neural) | Free, high quality, no API key needed |
-| Audio playback | pygame | Reliable cross-platform audio |
-| Spotify | spotipy | Official Spotify API wrapper |
-| Calendar / Gmail | google-api-python-client | Official Google API |
-| System stats | psutil | CPU, RAM, disk info |
-| Audio stream | sounddevice + numpy | Low-latency mic input for level meter |
-| HTTP requests | requests | For weather, news, GitHub APIs |
-
----
-
-## Wake Words
-
-Say any of these to activate N.O.O.R:
-
-```
-"Hey Noor"           ← Primary wake word
-"Noor"
-"Okay Noor"
-"Hello Noor"
-"Yo Noor"
-"Wake up Noor"
-"Noor wake up"
-```
-
-STT variants (handles accent + mishearing):
-`"hey nor"` / `"hey nur"` / `"hey nore"` / `"hey new"` / `"hey nu"` / `"a noor"` / `"a nor"`
-
-**End a session:** say `"thanks"`, `"bye"`, `"stop"`, `"that's all"`, or `"dismiss"`
-
-After activation, you can keep talking for up to **5 back-and-forth turns** before N.O.O.R returns to standby.
-
----
-
-## All Voice Commands
-
-### Briefings & Info
-| Say | Does |
-|---|---|
-| `"Morning briefing"` | Date, weather, top news, calendar events, email summary |
-| `"What's the weather"` | Dublin weather |
-| `"Weather in [city]"` | Weather for any city |
-| `"Tell me the news"` | World headlines |
-| `"Irish news"` / `"Tech news"` / `"AI news"` | Topic-specific headlines |
-| `"System info"` | CPU, RAM, disk usage, uptime |
-
-### Google Calendar
-| Say | Does |
-|---|---|
-| `"What do I have today"` | Today's events |
-| `"My week"` / `"Events this week"` | Next 7 days |
-| `"Add a meeting at 3pm tomorrow"` | Creates Google Calendar event |
-| `"I have a lecture at 9am"` | Creates event + adds to task list |
-| `"Open Google Calendar"` | Opens in browser |
-
-### Gmail
-| Say | Does |
-|---|---|
-| `"Check my email"` | Summary of today's inbox |
-| `"Yesterday's emails"` | Last 2 days |
-| `"Send an email to [name]"` | Compose and send |
-
-### Tasks & Notes
-| Say | Does |
-|---|---|
-| `"Add task [anything]"` | Adds to task list in GUI |
-| `"Remove task [name]"` | Removes matching task |
-| `"Take a note [text]"` | Saves timestamped note |
-| `"Read my notes"` | Reads notes back |
-
-### Spotify
-| Say | Does |
-|---|---|
-| `"Play"` / `"Resume music"` | Resumes playback |
-| `"Pause"` / `"Stop music"` | Pauses |
-| `"Next song"` / `"Skip"` | Skips track |
-| `"Previous song"` / `"Go back"` | Previous track |
-| `"What's playing"` | Current song and artist |
-| `"Like this song"` | Saves to Liked Songs |
-| `"Play Frank Ocean"` | Searches and plays |
-| `"Open Spotify"` | Launches Spotify app |
-
-### Health & Fitness
-| Say | Does |
-|---|---|
-| `"I ate chicken and rice"` | Logs meal with macro estimate |
-| `"I had 500 calories"` | Logs calorie count |
-| `"Log workout chest and back"` | Logs workout session |
-| `"Health summary"` | Daily meals, calories, macros |
-| `"Macros today"` | Protein + calorie total |
-| `"What's my workout today"` | Today's training split |
-| `"Calories today"` | How many kcal logged vs goal |
-
-### Apps & Websites
-| Say | Does |
-|---|---|
-| `"Open Chrome"` | Launches Chrome |
-| `"Open VS Code"` | Launches VS Code |
-| `"Open Discord"` | Launches Discord |
-| `"Open Notepad"` | Opens Notepad |
-| `"Open Calculator"` | Opens Calculator |
-| `"Open File Explorer"` | Opens Explorer |
-| `"Open YouTube"` | Opens youtube.com |
-| `"Open GitHub"` | Opens github.com |
-| `"Open UCD"` | Opens ucd.ie |
-| `"Open Blackboard"` | Opens UCD Brightspace |
-| `"Open Netflix"` / `"Open Notion"` | Any site in the list |
-| `"Search Google for [topic]"` | Google search |
-
-### Computer Control
-| Say | Does |
-|---|---|
-| `"Type [text]"` | Types at cursor |
-| `"Press Ctrl+C"` | Any keyboard shortcut |
-| `"Take a screenshot"` | Captures and saves screen |
-| `"Read my screen"` | Screenshots + AI analysis |
-| `"Explain code"` | Reads clipboard, explains it |
-| `"Volume up"` / `"Volume down"` | System volume ±10 |
-| `"Mute"` | Mutes audio |
-| `"Volume to 60"` | Sets exact level |
-| `"Lock screen"` | Locks Windows |
-| `"Remind me in 10 minutes to [x]"` | Sets a timed reminder |
-
-### Maps & Directions
-| Say | Does |
-|---|---|
-| `"Directions to UCD"` | Opens Google Maps route |
-| `"Where is [place]"` | Opens Maps location |
-| `"Open maps"` | Opens Google Maps |
-
-### GitHub
-| Say | Does |
-|---|---|
-| `"My repos"` | Lists your GitHub repositories |
-| `"GitHub issues"` | Lists open issues |
-
-### Documents
-| Say | Does |
-|---|---|
-| `"Create a word doc called [name]"` | Creates and opens a .docx file |
-
----
-
-## Setup
-
-### 1. Install Python dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Create your config file
-Copy `config.example.py` to `config.py` and fill in your keys:
-```python
-CLAUDE_API_KEY = "sk-ant-..."     # From console.anthropic.com
-SPOTIFY_CLIENT_ID = "..."          # From developer.spotify.com
-SPOTIFY_CLIENT_SECRET = "..."
-GITHUB_TOKEN = "..."               # Optional — for repos/issues
-```
-
-### 3. Google Calendar & Gmail (optional)
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a project, enable Calendar API and Gmail API
-3. Create OAuth 2.0 credentials, download as `google_credentials.json`
-4. Put it in the project folder
-5. First time N.O.O.R uses calendar/email, a browser will open to ask permission — approve it once
-
-### 4. Run it
-```bash
-py -3.11 main.py
-```
-Or double-click `N.O.O.R` on your desktop (uses `noor.vbs` to launch without a terminal window).
 
 ---
 
 ## GUI Layout
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│  N.O.O.R                           PERSONAL AI  v1.0       │
-├──────────────┬──────────────────────────┬──────────────────┤
-│              │                          │                  │
-│   TASKS      │      NOOR ORB            │   CALENDAR       │
-│              │    (animated dot)        │  (monthly view)  │
-│  [ ] Task 1  │     ● STANDBY            │                  │
-│  [ ] Task 2  │                          │  May 2026        │
-│              │  "what you said"         │  Mo Tu We Th...  │
-│  + Add Task  │  "noor's response"       │  ● event dots    │
-│              │                          │                  │
-│  ──────────  │  WEATHER NEWS BRIEF      │                  │
-│   TIMER      │  HEALTH EMAIL SCREEN     │   MAPS SEARCH    │
-│   00:00      │                          │                  │
-│  START RESET │  [mic level indicator]   │  UCD  CITY  HOME │
-└──────────────┴──────────────────────────┴──────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  N . O . O . R                              PERSONAL AI  v1.0    │
+│  ─────────────────────────────────────────────────────────────   │
+├──────────────────┬────────────────────────────┬──────────────────┤
+│                  │                            │                  │
+│   📋 TASKS       │         ● STANDBY          │   📅 CALENDAR    │
+│  ─────────────   │      (LISTENING = green)   │   ────────────   │
+│  ☐ task one      │      (PROCESSING = amber)  │   May 2026       │
+│  ☐ task two      │      (SPEAKING = cyan)     │   Mo Tu We Th Fr │
+│  ☑ done task     │                            │    1  2  3  4  5 │
+│                  │   "what you said..."        │    ●           ● │
+│  + Add Task      │   ─────────────────────    │   12 13 14 15 16 │
+│                  │   "noor's response here"    │                  │
+│  ─────────────   │                            │  ─────────────── │
+│   ⏱ TIMER        │  [WEATHER] [NEWS] [BRIEF]  │   🗺 MAPS        │
+│   00:00          │  [HEALTH]  [EMAIL] [SCREEN] │                  │
+│  START   RESET   │                            │  UCD  CITY  HOME │
+│                  │  ▓▓▓▓▓░░░░  mic level       │                  │
+└──────────────────┴────────────────────────────┴──────────────────┘
 ```
 
 ---
 
-## Data Files
+## Tech Stack
 
-All your data stays local in the `data/` folder. Plain JSON files — readable in any text editor.
+| Component | Library | Why chosen |
+|---|---|---|
+| GUI | `customtkinter` | Modern look, runs natively on Windows |
+| Voice input | `SpeechRecognition` + Google STT | Free, no API key, good accuracy |
+| AI brain | Claude Haiku (`anthropic` API) | Fast (< 1s), cheap, perfect for short replies |
+| Voice output | `edge-tts` (Microsoft Neural) | Free, no key needed, high quality |
+| Audio playback | `pygame` | Reliable, handles mp3 streams well |
+| Spotify | `spotipy` | Official Spotify API wrapper |
+| Calendar + Gmail | `google-api-python-client` | Official Google OAuth2 API |
+| System stats | `psutil` | CPU, RAM, disk, process info |
+| Mic stream | `sounddevice` + `numpy` | Low-latency input for level meter |
+| Web requests | `requests` | Weather (Open-Meteo), news (RSS), GitHub |
 
-**tasks.json**
-```json
-{
-  "tasks": [
-    {"text": "Buy groceries", "done": false},
-    {"text": "Submit lab report", "done": true}
-  ]
-}
+---
+
+## Wake Words
+
+N.O.O.R listens continuously. Say any of these to activate:
+
+```
+Primary:   "Hey Noor"  ·  "Noor"  ·  "Okay Noor"
+Also:      "Hello Noor"  ·  "Yo Noor"  ·  "Wake up Noor"
+
+STT variants (accent + mishearing coverage):
+           "hey nor"  ·  "hey nur"  ·  "hey nore"
+           "hey new"  ·  "hey nu"  ·  "a noor"
 ```
 
-**calories.json**
-```json
-{
-  "2026-05-25": 2340,
-  "2026-05-24": 2610
-}
+After activation: up to **5 conversation turns** without repeating the wake word.
+
+**To end:** say `"thanks"` · `"bye"` · `"stop"` · `"that's all"` · `"dismiss"`
+
+---
+
+## All Voice Commands
+
+### Info & Briefings
+| Command | What happens |
+|---|---|
+| `"Morning briefing"` | Date, weather, news, calendar events, email summary |
+| `"What's the weather"` | Dublin weather (Open-Meteo, no key needed) |
+| `"Weather in [city]"` | Any city worldwide |
+| `"Tell me the news"` | World headlines via RSS |
+| `"Irish news"` / `"Tech news"` / `"AI news"` | Topic-filtered headlines |
+| `"System info"` | CPU %, RAM %, disk %, uptime |
+
+### Google Calendar
+| Command | What happens |
+|---|---|
+| `"What do I have today"` | Today's events |
+| `"My week"` / `"Events this week"` | Next 7 days |
+| `"Add a meeting at 3pm tomorrow"` | Creates Calendar event |
+| `"I have a lecture at 9am"` | Creates event + adds task |
+| `"Open Google Calendar"` | Opens calendar.google.com |
+
+### Gmail
+| Command | What happens |
+|---|---|
+| `"Check my email"` | Today's inbox summary |
+| `"Yesterday's emails"` | Last 2 days |
+| `"Send an email to [name]"` | Compose and send via Gmail |
+
+### Tasks & Notes
+| Command | What happens |
+|---|---|
+| `"Add task [text]"` | Adds to task list in GUI |
+| `"Remove task [text]"` | Deletes matching task |
+| `"Take a note [text]"` | Timestamped note saved |
+| `"Read my notes"` | Reads notes back |
+
+### Spotify
+| Command | What happens |
+|---|---|
+| `"Play"` / `"Pause"` / `"Skip"` / `"Previous"` | Playback control |
+| `"What's playing"` | Current song + artist |
+| `"Like this song"` | Saves to Liked Songs |
+| `"Play [artist/song]"` | Search and play |
+| `"Open Spotify"` | Launches Spotify app |
+
+### Health & Fitness
+| Command | What happens |
+|---|---|
+| `"I ate chicken and rice"` | Logs meal, estimates macros via Claude |
+| `"I had 500 calories"` | Logs calorie count |
+| `"Log workout chest and back"` | Logs session |
+| `"Health summary"` | Daily meals, calories, macros |
+| `"What's my workout today"` | Today's training split |
+| `"Calories today"` | Logged vs daily goal |
+
+### Apps & Websites
+| Command | What happens |
+|---|---|
+| `"Open Chrome / VS Code / Discord / Notepad"` | Launches app |
+| `"Open YouTube / GitHub / Netflix / Notion"` | Opens in browser |
+| `"Open UCD"` / `"Open Blackboard"` | University sites |
+| `"Search Google for [topic]"` | Opens browser with search |
+
+### Computer Control
+| Command | What happens |
+|---|---|
+| `"Type [text]"` | Types at current cursor position |
+| `"Press Ctrl+C"` | Fires any keyboard shortcut |
+| `"Read my screen"` | Screenshot → AI analysis |
+| `"Explain code"` | Reads clipboard, explains it |
+| `"Volume up / down / mute"` | System audio control |
+| `"Volume to 60"` | Sets exact level |
+| `"Lock screen"` | Locks Windows |
+| `"Take a screenshot"` | Saves screenshot |
+| `"Remind me in 10 minutes to [x]"` | Timed reminder |
+
+### Maps & GitHub
+| Command | What happens |
+|---|---|
+| `"Directions to [place]"` | Google Maps route |
+| `"Where is [place]"` | Opens Maps location |
+| `"My repos"` / `"GitHub issues"` | Lists your repos / open issues |
+
+---
+
+## Setup
+
+### 1. Clone and install
+```bash
+git clone https://github.com/tayyabali297/NOOR.git
+cd NOOR
+pip install -r requirements.txt
 ```
 
-**workout.json** — your weekly split:
-```json
-{
-  "mon": {"exercises": ["Chest", "Triceps"], "notes": ""},
-  "tue": {"exercises": ["Back", "Biceps"], "notes": ""}
-}
+### 2. Create config.py
+```bash
+cp config.example.py config.py
+```
+Then fill in your keys:
+```python
+CLAUDE_API_KEY = "sk-ant-..."        # console.anthropic.com
+SPOTIFY_CLIENT_ID = "..."             # developer.spotify.com
+SPOTIFY_CLIENT_SECRET = "..."
+GITHUB_TOKEN = "..."                  # optional
+```
+
+### 3. Google Calendar + Gmail (optional)
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Enable the **Calendar API** and **Gmail API**
+3. Create OAuth 2.0 credentials → download as `google_credentials.json`
+4. Place `google_credentials.json` in the project folder
+5. First run will open a browser to approve access — one time only
+
+### 4. Create your personal profile (optional but recommended)
+Create `noor_knowledge.md` in the project folder. Write anything you want N.O.O.R to know about you — goals, schedule, preferences. This gets loaded into every Claude prompt. See `config.example.py` for ideas.
+
+### 5. Run
+```bash
+py -3.11 main.py
+```
+Or double-click `N.O.O.R` on the desktop.
+
+---
+
+## Data Storage
+
+All data is stored locally in `data/` as plain JSON — readable in any text editor, never committed to git.
+
+```
+data/tasks.json      → [{"text": "Buy groceries", "done": false}, ...]
+data/calories.json   → {"2026-05-25": 2340, ...}
+data/health.json     → meal logs with macro estimates
+data/workout.json    → weekly training split + session history
+data/notes.txt       → [2026-05-25 09:14] your note here
 ```
 
 ---
@@ -331,13 +307,12 @@ All your data stays local in the `data/` folder. Plain JSON files — readable i
 
 | Problem | Fix |
 |---|---|
-| App won't start | Make sure `config.py` exists with your Claude API key |
-| Wake word not triggering | Speak clearly, check microphone is set as default in Windows Sound settings |
-| N.O.O.R hears itself | Normal — `is_speaking` flag mutes the mic during TTS. If it still happens, increase `energy_threshold` in main.py (line ~143) |
-| Google Calendar not working | Check `google_credentials.json` is in the project folder and run once to approve access |
-| Spotify commands not working | Spotify must be open. Check `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` in config.py |
-| Desktop shortcut gives "file not found" | Right-click shortcut → Properties → check the path matches your actual folder location |
-| GUI freezes | Shouldn't happen — all voice processing runs on background threads. If it does, restart with `launch.bat` |
+| App won't start | Check `config.py` exists with `CLAUDE_API_KEY` set |
+| Wake word not triggering | Check microphone is default in Windows Sound settings |
+| N.O.O.R hears itself | Normal — `is_speaking` flag mutes mic during TTS. If it still triggers, raise `energy_threshold` in main.py ~line 143 |
+| Google Calendar broken | Ensure `google_credentials.json` is in project folder, run once to approve |
+| Spotify not responding | Spotify must be open. Verify client ID/secret in config.py |
+| Shortcut gives "file not found" | Right-click shortcut → Properties → fix the target path |
 
 ---
 
@@ -347,13 +322,4 @@ All your data stays local in the `data/` folder. Plain JSON files — readable i
 py -3.11 test_jarvis.py
 ```
 
-Tests cover: routing for weather, news, tasks, notes, Spotify, workouts, meals, calories, and calendar. All 9 should pass.
-
----
-
-## What's Not Included (By Design)
-
-- **No cloud deployment** — runs 100% on your machine
-- **No web server** — `noor.html` connects locally via WebSocket on port 8765
-- **No database** — JSON files are enough for one person's data
-- **No always-on cloud AI** — Claude is only called when the router can't handle a command locally
+9 tests covering: weather, news, Spotify, tasks, notes, workouts, meals, calories, calendar routing. All should pass.

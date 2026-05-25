@@ -12,6 +12,11 @@ __pycache__/
 # Personal data
 data/
 *.mp3
+noor_knowledge.md
+
+# Claude Code internal files — not project files
+CLAUDE.md
+SKILLS.md
 
 # Environment
 .env
