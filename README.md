@@ -2,7 +2,7 @@
 
 A voice-activated personal AI assistant for Windows. Talks back. Controls your computer. Knows your context. Runs entirely locally — no cloud deployment, no subscription.
 
-Windows 11 · Python 3.11 · Always listening · Always ready
+Windows 11 · Python 3.11 · Always listening · Always ready · v1.0
 
 ---
 
