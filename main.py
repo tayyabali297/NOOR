@@ -69,11 +69,9 @@ SAMPLE_RATE  = 16000
 WAKE_WORDS = [
     # NOOR — primary + STT mis-transcription variants
     "hey noor", "noor", "okay noor", "wake up noor",
-    "hey nor", "nor ", " nor", "hey no ", "hey new",
-    "hey nu", "a noor", "a nor",
-    # Fallback trigger phrases
-    "let's get to work", "lets get to work", "get to work",
-    "let's go", "lets go",
+    "hello noor", "yo noor", "noor wake up", "noor hey",
+    "hey nur", "hey nore", "hey nor", "nor ", " nor",
+    "hey no ", "hey new", "hey nu", "a noor", "a nor",
 ]
 EXIT_WORDS = {
     "thanks", "bye", "stop", "that's all", "goodbye",
@@ -144,8 +142,8 @@ Instead say: "Try saying: [the correct voice command]" and give them the right p
 
 # ── STT ──────────────────────────────────────────────────────────
 stt = sr.Recognizer()
-stt.energy_threshold         = 200
-stt.dynamic_energy_threshold = True
+stt.energy_threshold         = 400   # Slightly higher fixed threshold
+stt.dynamic_energy_threshold = False # Disable to prevent TTS room echo from breaking it
 stt.pause_threshold          = 1.4   # wait 1.4s of silence before cutting off
 
 # ── Global state ─────────────────────────────────────────────────
@@ -535,7 +533,7 @@ def record_and_transcribe(seconds: int, after_speech: bool = False) -> str:
         time.sleep(0.05)
     try:
         with sr.Microphone() as source:
-            stt.adjust_for_ambient_noise(source, duration=0.3)
+            # Removed adjust_for_ambient_noise to avoid raising noise floor during TTS echoes
             audio = stt.listen(source, timeout=seconds, phrase_time_limit=seconds)
             return stt.recognize_google(audio, language="en-IE")
     except sr.WaitTimeoutError:
@@ -570,11 +568,26 @@ def think(prompt: str, system: str = None) -> str:
         "max_tokens": 80,
         "system": sys_p,
         "messages": history,
+        "stream": True,
     }
     try:
-        r = requests.post(CLAUDE_URL, json=body, headers=hdrs, timeout=20)
+        r = requests.post(CLAUDE_URL, json=body, headers=hdrs, stream=True, timeout=20)
         r.raise_for_status()
-        reply = r.json()["content"][0]["text"].strip()
+        reply = ""
+        for line in r.iter_lines():
+            if line:
+                decoded = line.decode('utf-8')
+                if decoded.startswith("data: "):
+                    data_str = decoded[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(data_str)
+                        if data.get("type") == "content_block_delta":
+                            reply += data["delta"].get("text", "")
+                            if _app: _app.show(reply)
+                    except: pass
+        reply = reply.strip()
     except Exception as e:
         print(f"Claude error: {e}")
         reply = "I couldn't reach the API, sir. Check your connection."
@@ -1207,7 +1220,7 @@ def take_note(text: str) -> str:
     history.append({"role": "user",    "content": f"[system] Note saved: {text}"})
     history.append({"role": "assistant","content": "Noted."})
     if len(history) > 20:
-        history[-20:]
+        history = history[-20:]
     if _app:
         _app.after(0, _app._refresh_notes)
     return "Note saved."
@@ -1745,7 +1758,7 @@ def route(text: str) -> str:
 
     # ── Google + search combo (must be before generic sites loop) ──
     if "google" in t and any(x in t for x in ["search", "search for", "look up", "find"]):
-        q = _extract_after(t, "search for", "search", "look up", "find") or ""
+        q = _extract_after(t, "search google for", "search for", "search", "look up", "find") or ""
         if q:
             url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
             webbrowser.open(url)
@@ -1871,11 +1884,9 @@ def _mic_level_loop():
     global _mic_stream, _interrupt_speech
 
     def callback(indata, frames, time_info, status):
+        global _interrupt_speech
         raw   = float(np.abs(indata).mean() * 300)
         level = 0.0 if is_speaking else min(raw, 100.0)
-        # Only cut if user is actually speaking loudly (not ambient noise)
-        if is_speaking and raw > 20:
-            _interrupt_speech = True
         if _app:
             _app.after(0, _app._update_mic_level, level)
 
@@ -2000,7 +2011,7 @@ def _handle():
         if app:
             try:
                 app.set_status("STANDBY")
-                app.after(0, app._do_show_heard, "—")
+                app.after(0, app.show_heard, "—")
             except: pass
 
 
@@ -2061,9 +2072,6 @@ class NoorApp:
     def show_heard(self, cmd: str):
         ws_broadcast({"type": "said", "text": cmd})
 
-    def _do_show_heard(self, cmd: str):
-        self.show_heard(cmd)
-
     def _render_tasks(self):
         _ws_push_tasks()
 
@@ -2093,8 +2101,16 @@ class NoorApp:
 if __name__ == "__main__":
     _html_path = os.path.join(BASE, "noor.html").replace("\\", "/")
 
+    def is_backend_running():
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('127.0.0.1', 8765)) == 0
+
     def _start_backend():
         """Called by pywebview after the GUI loop starts — safe to spin up threads here."""
+        if is_backend_running():
+            print("[NOOR] Backend already running. Launching UI only.")
+            return
         threading.Thread(target=_start_ws_server, daemon=True).start()
         time.sleep(0.6)
         NoorApp()
@@ -2115,6 +2131,12 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[NOOR] pywebview failed ({e}), falling back to browser")
         # Fallback: start backend then open in browser
+        if is_backend_running():
+            import sys
+            print("[NOOR] Backend already running. Launching UI only.")
+            webbrowser.open(f"file:///{_html_path}")
+            sys.exit(0)
+
         threading.Thread(target=_start_ws_server, daemon=True).start()
         time.sleep(0.6)
         app = NoorApp()
